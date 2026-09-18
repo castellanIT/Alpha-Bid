@@ -4,6 +4,7 @@ export type AuctionStatus =
   | "PLAYER_UP"
   | "BIDDING"
   | "PAUSED"
+  | "DRAW"
   | "SOLD"
   | "UNSOLD"
   | "ENDED";
@@ -11,6 +12,12 @@ export type AuctionStatus =
 export type PlayerStatus = "AVAILABLE" | "LIVE" | "SOLD" | "UNSOLD";
 
 export type UserRole = "ADMIN" | "CAPTAIN" | "SPECTATOR";
+
+export type PlayingRole = "BAT" | "BOWL" | "ALL_ROUNDER";
+
+export type SkillLevel = "ADVANCED" | "INTERMEDIATE";
+
+export type PlayerHand = "RIGHT" | "LEFT";
 
 export interface Team {
   id: string;
@@ -30,6 +37,9 @@ export interface Player {
   teamId: string | null;
   soldPrice: number | null;
   isCaptain: boolean;
+  playingRole: PlayingRole | null;
+  skillLevel: SkillLevel | null;
+  hand: PlayerHand | null;
 }
 
 export interface Bid {
@@ -41,6 +51,15 @@ export interface Bid {
   createdAt: string;
 }
 
+export interface DrawState {
+  playerId: string;
+  contenderTeamIds: string[];
+  cardOrder: string[];
+  pickerTeamId: string | null;
+  revealedIndex: number | null;
+  winnerTeamId: string | null;
+}
+
 export interface Auction {
   id: string;
   name: string;
@@ -49,6 +68,7 @@ export interface Auction {
   currentBid: number | null;
   currentBidTeamId: string | null;
   bidEndsAt: string | null;
+  draw: DrawState | null;
 }
 
 export interface UserProfile {

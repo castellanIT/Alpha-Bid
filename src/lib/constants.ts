@@ -2,6 +2,7 @@ export const PURSE_TOTAL = 1000;
 export const BASE_PRICE = 50;
 export const BID_INCREMENT = 25;
 export const MAX_BID_PERCENT = 0.5;
+export const EQUAL_BID_AMOUNT = 500;
 export const SQUAD_TARGET = 7;
 export const AUCTION_ID = "auction-main";
 

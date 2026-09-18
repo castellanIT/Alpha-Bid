@@ -1,6 +1,7 @@
 import {
   BASE_PRICE,
   BID_INCREMENT,
+  EQUAL_BID_AMOUNT,
   MAX_BID_PERCENT,
   PURSE_TOTAL,
 } from "./constants";
@@ -13,12 +14,38 @@ export function maxBidForTeam(team: Team): number {
   );
 }
 
+export function teamsWithEqualBid(
+  state: AuctionState,
+  playerId: string,
+  amount: number = EQUAL_BID_AMOUNT
+): string[] {
+  const ids = new Set<string>();
+  for (const b of state.bids) {
+    if (b.playerId === playerId && b.amount === amount) {
+      ids.add(b.teamId);
+    }
+  }
+  return [...ids];
+}
+
+export function teamAlreadyEqualBid(
+  state: AuctionState,
+  playerId: string,
+  teamId: string,
+  amount: number = EQUAL_BID_AMOUNT
+): boolean {
+  return state.bids.some(
+    (b) => b.playerId === playerId && b.teamId === teamId && b.amount === amount
+  );
+}
+
 export function minNextBid(state: AuctionState): number {
   const player = state.players.find(
     (p) => p.id === state.auction.currentPlayerId
   );
   const base = player?.basePrice ?? BASE_PRICE;
   if (state.auction.currentBid == null) return base;
+  if (state.auction.currentBid === EQUAL_BID_AMOUNT) return EQUAL_BID_AMOUNT;
   return state.auction.currentBid + BID_INCREMENT;
 }
 
@@ -43,9 +70,6 @@ export function validateBid(
     return `Bid must be in increments of ${BID_INCREMENT}`;
   }
 
-  const min = minNextBid(state);
-  if (amount < min) return `Bid must be at least ${min}`;
-
   const max = maxBidForTeam(team);
   if (amount > max) {
     return `Max bid is ${max} (50% of purse / remaining)`;
@@ -53,6 +77,35 @@ export function validateBid(
 
   if (amount > team.purseRemaining) {
     return "Insufficient purse";
+  }
+
+  const current = auction.currentBid;
+
+  if (amount === EQUAL_BID_AMOUNT) {
+    if (current != null && current > EQUAL_BID_AMOUNT) {
+      return "Invalid bid amount";
+    }
+    if (current != null && current < EQUAL_BID_AMOUNT) {
+      const min = minNextBid(state);
+      if (amount < min) return `Bid must be at least ${min}`;
+    }
+    if (
+      teamAlreadyEqualBid(state, auction.currentPlayerId, teamId, EQUAL_BID_AMOUNT)
+    ) {
+      return "Your team already matched ₹500";
+    }
+    return null;
+  }
+
+  if (current === EQUAL_BID_AMOUNT) {
+    return "Only ₹500 matching bids allowed now — go to draw if tied";
+  }
+
+  const min = minNextBid(state);
+  if (amount < min) return `Bid must be at least ${min}`;
+
+  if (current != null && amount === current) {
+    return "Equal bids only allowed at ₹500";
   }
 
   if (auction.currentBidTeamId === teamId) {
@@ -66,4 +119,4 @@ export function effectiveMaxDisplay(team: Team): number {
   return maxBidForTeam(team);
 }
 
-export { PURSE_TOTAL, BASE_PRICE, BID_INCREMENT, MAX_BID_PERCENT };
+export { PURSE_TOTAL, BASE_PRICE, BID_INCREMENT, MAX_BID_PERCENT, EQUAL_BID_AMOUNT };

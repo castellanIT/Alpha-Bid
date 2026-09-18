@@ -6,6 +6,27 @@ import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/Brand";
 import { clearSession, loadSession, saveSession, useAuctionState } from "@/lib/hooks";
 
+const ROLES = [
+  {
+    title: "Admin",
+    pin: "0000",
+    hint: "Run the auction & draws",
+    accent: "from-[#1a0808] to-black",
+  },
+  {
+    title: "Captain",
+    pin: "1001–1008",
+    hint: "Tigers → Wolves",
+    accent: "from-[#120808] to-black",
+  },
+  {
+    title: "Spectator",
+    pin: "9999",
+    hint: "Watch the live board",
+    accent: "from-[#0a0a0a] to-black",
+  },
+] as const;
+
 export default function HomePage() {
   const { state, loading } = useAuctionState();
   const router = useRouter();
@@ -20,9 +41,10 @@ export default function HomePage() {
     if (session.role === "SPECTATOR") router.replace("/board");
   }, [state, router]);
 
-  function login() {
+  function login(overridePin?: string) {
     if (!state) return;
-    const user = state.users.find((u) => u.pin === pin.trim());
+    const value = (overridePin ?? pin).trim();
+    const user = state.users.find((u) => u.pin === value);
     if (!user) {
       setErr("Invalid PIN");
       return;
@@ -42,7 +64,7 @@ export default function HomePage() {
           <p className="mt-6 text-sm font-semibold uppercase tracking-[0.4em] text-gold">
             Live Pool Auction
           </p>
-          <h1 className="font-display mt-2 text-5xl text-silver-bright text-white md:text-7xl">
+          <h1 className="font-display mt-2 text-5xl text-white md:text-7xl">
             TURF CRICKET
           </h1>
           <p className="mt-4 max-w-xl text-lg text-muted">
@@ -52,7 +74,34 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="mt-8 grid gap-6 md:grid-cols-2">
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        {ROLES.map((role) => (
+          <button
+            key={role.title}
+            type="button"
+            className={`panel bid-pulse-soft bg-gradient-to-br ${role.accent} text-left transition hover:border-[rgba(245,197,24,0.55)]`}
+            onClick={() => {
+              if (role.title === "Admin") {
+                setPin("0000");
+                login("0000");
+              } else if (role.title === "Spectator") {
+                setPin("9999");
+                login("9999");
+              } else {
+                setPin("1001");
+              }
+            }}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-gold">
+              {role.title}
+            </p>
+            <p className="font-display mt-2 text-2xl text-white">{role.pin}</p>
+            <p className="mt-1 text-sm text-muted">{role.hint}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div className="panel space-y-4">
           <h2 className="font-display text-3xl text-gold">Enter with PIN</h2>
           {loading && <p className="text-sm text-muted">Loading…</p>}
@@ -64,7 +113,11 @@ export default function HomePage() {
             onKeyDown={(e) => e.key === "Enter" && login()}
           />
           {err && <p className="text-sm text-crimson">{err}</p>}
-          <button className="btn-primary w-full" onClick={login} disabled={loading}>
+          <button
+            className="btn-primary w-full"
+            onClick={() => login()}
+            disabled={loading}
+          >
             Join auction
           </button>
           <button
@@ -72,6 +125,7 @@ export default function HomePage() {
             onClick={() => {
               clearSession();
               setPin("");
+              setErr(null);
             }}
           >
             Clear session
@@ -79,17 +133,8 @@ export default function HomePage() {
         </div>
 
         <div className="panel space-y-3 text-sm text-muted">
-          <h3 className="font-display text-2xl text-white">PINs</h3>
-          <p>
-            <span className="text-gold">Admin</span> — 0000
-          </p>
-          <p>
-            <span className="text-gold">Captains</span> — 1001 … 1008 (Tigers →
-            Wolves)
-          </p>
-          <p>
-            <span className="text-gold">Spectator</span> — 9999
-          </p>
+          <h3 className="font-display text-2xl text-white">Quick links</h3>
+          <p>Same Alpha Warriors theme on admin, captain, and board.</p>
           <div className="flex flex-wrap gap-2 pt-2">
             <Link className="btn-secondary" href="/board">
               Open board

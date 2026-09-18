@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { teamSquad } from "@/components/AuctionUI";
+import { PlayerProfile, teamSquad } from "@/components/AuctionUI";
 import { PageHeader } from "@/components/Brand";
 import { useAuctionState } from "@/lib/hooks";
 
@@ -57,12 +57,9 @@ export default function SummaryPage() {
               {squad.map((p) => (
                 <li
                   key={p.id}
-                  className="flex justify-between border-b border-[rgba(245,197,24,0.1)] py-1.5"
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(245,197,24,0.1)] py-1.5"
                 >
-                  <span>
-                    {p.name}
-                    {p.isCaptain ? " (C)" : ""}
-                  </span>
+                  <PlayerProfile player={p} compact />
                   <span className="text-gold">₹{p.soldPrice ?? 0}</span>
                 </li>
               ))}

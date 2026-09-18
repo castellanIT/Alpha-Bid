@@ -2,6 +2,7 @@ import { Redis } from "@upstash/redis";
 import { promises as fs } from "fs";
 import path from "path";
 import { createSeedState } from "./seed";
+import { normalizePlayers } from "./players";
 import type { AuctionState } from "./types";
 
 const DATA_PATH = path.join(process.cwd(), "data", "auction.json");
@@ -48,20 +49,22 @@ async function writeFileState(state: AuctionState): Promise<void> {
 
 export async function readState(): Promise<AuctionState> {
   const redis = redisClient();
+  let state: AuctionState;
   if (redis) {
-    const state = await redis.get<AuctionState>(REDIS_KEY);
-    if (state) return state;
-    const seeded = createSeedState();
-    await redis.set(REDIS_KEY, seeded);
-    return seeded;
-  }
-
-  if (process.env.VERCEL) {
+    const stored = await redis.get<AuctionState>(REDIS_KEY);
+    if (stored) state = stored;
+    else {
+      state = createSeedState();
+      await redis.set(REDIS_KEY, state);
+    }
+  } else if (process.env.VERCEL) {
     if (!g.__auctionMem) g.__auctionMem = createSeedState();
-    return structuredClone(g.__auctionMem);
+    state = structuredClone(g.__auctionMem);
+  } else {
+    state = await readFileState();
   }
-
-  return readFileState();
+  if (!state.auction.draw) state.auction.draw = null;
+  return normalizePlayers(state);
 }
 
 export async function writeState(state: AuctionState): Promise<void> {

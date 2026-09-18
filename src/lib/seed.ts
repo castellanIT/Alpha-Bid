@@ -7,6 +7,7 @@ import {
   TEAM_NAMES,
 } from "./constants";
 import type { AuctionState, Player, Team, UserProfile } from "./types";
+import { defaultHand, defaultPlayingRole, defaultSkillLevel } from "./players";
 
 const PLAYER_FIRST = [
   "Ayaan",
@@ -75,6 +76,9 @@ export function createSeedState(): AuctionState {
     teamId: team.id,
     soldPrice: 0,
     isCaptain: true,
+    playingRole: "ALL_ROUNDER",
+    skillLevel: "ADVANCED",
+    hand: "RIGHT",
   }));
 
   const auctionPlayers: Player[] = Array.from({ length: 48 }, (_, i) => ({
@@ -85,6 +89,9 @@ export function createSeedState(): AuctionState {
     teamId: null,
     soldPrice: null,
     isCaptain: false,
+    playingRole: defaultPlayingRole(i),
+    skillLevel: defaultSkillLevel(i),
+    hand: defaultHand(i),
   }));
 
   const users: UserProfile[] = [
@@ -120,6 +127,7 @@ export function createSeedState(): AuctionState {
       currentBid: null,
       currentBidTeamId: null,
       bidEndsAt: null,
+      draw: null,
     },
     teams,
     players: [...captainPlayers, ...auctionPlayers],
@@ -130,4 +138,8 @@ export function createSeedState(): AuctionState {
 
 export function newBidId(): string {
   return randomUUID();
+}
+
+export function newPlayerId(): string {
+  return `player-${randomUUID().slice(0, 8)}`;
 }

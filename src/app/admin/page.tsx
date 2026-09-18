@@ -3,12 +3,21 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { LiveLot, PurseBar, teamName } from "@/components/AuctionUI";
+import { LiveLot, PlayerProfile, PurseBar, teamName } from "@/components/AuctionUI";
 import { PageHeader } from "@/components/Brand";
+import { DrawScreen } from "@/components/DrawScreen";
+import {
+  SoldCelebration,
+  useSoldCelebration,
+} from "@/components/SoldCelebration";
+import { EQUAL_BID_AMOUNT } from "@/lib/constants";
 import { clearSession, loadSession, useAuctionState } from "@/lib/hooks";
+import { teamsWithEqualBid } from "@/lib/rules";
+import type { PlayerHand, PlayingRole, SkillLevel } from "@/lib/types";
 
 export default function AdminPage() {
   const { state, error, loading, mutate, setError } = useAuctionState();
+  const { burst, soldPlayer } = useSoldCelebration(state);
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
 
@@ -37,6 +46,15 @@ export default function AdminPage() {
       .reverse();
   }, [state]);
 
+  const leadingTeamId = state?.auction.currentBidTeamId ?? null;
+  const highBid = state?.auction.currentBid ?? null;
+  const equalContenders = useMemo(() => {
+    if (!state?.auction.currentPlayerId || highBid !== EQUAL_BID_AMOUNT) {
+      return [] as string[];
+    }
+    return teamsWithEqualBid(state, state.auction.currentPlayerId);
+  }, [state, highBid]);
+
   async function act(action: string, extra: Record<string, unknown> = {}) {
     if (!userId) return;
     await mutate({ action, userId, ...extra });
@@ -48,11 +66,15 @@ export default function AdminPage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6">
+      <SoldCelebration state={state} burst={burst} soldPlayer={soldPlayer} />
       <PageHeader
         title="Admin Control"
         subtitle={state.auction.name}
         actions={
           <>
+            <Link href="/admin/players" className="btn-secondary">
+              Players
+            </Link>
             <Link href="/board" className="btn-secondary">
               Board
             </Link>
@@ -81,8 +103,28 @@ export default function AdminPage() {
         </div>
       )}
 
-      <LiveLot state={state} />
+      {state.auction.status === "DRAW" ? (
+        <DrawScreen
+          state={state}
+          isAdmin={true}
+          myTeamId={null}
+          onAssignPicker={(pickerTeamId) =>
+            act("assignDrawPicker", { pickerTeamId })
+          }
+          onReveal={(cardIndex) => act("revealDrawCard", { cardIndex })}
+        />
+      ) : (
+        <LiveLot state={state} emphasizeBid showSkill />
+      )}
 
+      {equalContenders.length > 1 && state.auction.status === "BIDDING" && (
+        <p className="rounded-xl border border-[rgba(245,197,24,0.35)] bg-[rgba(245,197,24,0.08)] px-4 py-3 text-sm text-gold">
+          ₹500 tied by {equalContenders.length} teams — press{" "}
+          <strong>Sold</strong> to open the scratch-card draw.
+        </p>
+      )}
+
+      {state.auction.status !== "DRAW" && (
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" onClick={() => act("start")}>
           Start
@@ -109,13 +151,38 @@ export default function AdminPage() {
           Reset seed
         </button>
       </div>
+      )}
+
+      {state.auction.status === "DRAW" && (
+        <div className="panel border-[rgba(245,197,24,0.45)] text-center">
+          <p className="font-display text-2xl text-gold">Draw in progress</p>
+          <p className="mt-1 text-sm text-muted">
+            Assign a non-₹500 team in the popup, then scratch (or let that
+            captain scratch).
+          </p>
+          <button
+            className="btn-secondary mt-4"
+            onClick={() => act("markUnsold")}
+          >
+            Cancel lot (unsold)
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="panel">
           <h2 className="font-display text-2xl text-gold">Purses</h2>
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-3">
             {state.teams.map((t) => (
-              <PurseBar key={t.id} team={t} />
+              <PurseBar
+                key={t.id}
+                team={t}
+                leading={
+                  equalContenders.length > 1
+                    ? equalContenders.includes(t.id)
+                    : t.id === leadingTeamId
+                }
+              />
             ))}
           </div>
         </section>
@@ -124,23 +191,79 @@ export default function AdminPage() {
           <h2 className="font-display text-2xl text-gold">
             Queue ({queue.length})
           </h2>
-          <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto text-sm">
+          <p className="mt-1 text-xs text-muted">
+            Role & hand are public · Skill is admin-only
+          </p>
+          <ul className="mt-3 max-h-[28rem] space-y-3 overflow-y-auto text-sm">
             {queue.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-[rgba(245,197,24,0.12)] bg-black/40 px-3 py-2"
+                className="space-y-2 rounded-lg border border-[rgba(245,197,24,0.12)] bg-black/40 px-3 py-3"
               >
-                <span>
-                  {p.name}{" "}
-                  <span className="text-muted">₹{p.basePrice}</span>
-                </span>
-                <button
-                  className="btn-secondary"
-                  style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
-                  onClick={() => act("putPlayerUp", { playerId: p.id })}
-                >
-                  Put up
-                </button>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <PlayerProfile player={p} showSkill compact />
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
+                    onClick={() => act("putPlayerUp", { playerId: p.id })}
+                  >
+                    Put up
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    className="input"
+                    style={{ width: "auto" }}
+                    value={p.playingRole ?? ""}
+                    onChange={(e) =>
+                      act("updatePlayerProfile", {
+                        playerId: p.id,
+                        playingRole: (e.target.value || null) as PlayingRole | null,
+                        skillLevel: p.skillLevel,
+                        hand: p.hand,
+                      })
+                    }
+                  >
+                    <option value="">Role</option>
+                    <option value="BAT">Batter</option>
+                    <option value="BOWL">Bowler</option>
+                    <option value="ALL_ROUNDER">All-rounder</option>
+                  </select>
+                  <select
+                    className="input"
+                    style={{ width: "auto" }}
+                    value={p.hand ?? ""}
+                    onChange={(e) =>
+                      act("updatePlayerProfile", {
+                        playerId: p.id,
+                        playingRole: p.playingRole,
+                        skillLevel: p.skillLevel,
+                        hand: (e.target.value || null) as PlayerHand | null,
+                      })
+                    }
+                  >
+                    <option value="">Hand</option>
+                    <option value="RIGHT">Right</option>
+                    <option value="LEFT">Left</option>
+                  </select>
+                  <select
+                    className="input"
+                    style={{ width: "auto" }}
+                    value={p.skillLevel ?? ""}
+                    onChange={(e) =>
+                      act("updatePlayerProfile", {
+                        playerId: p.id,
+                        playingRole: p.playingRole,
+                        skillLevel: (e.target.value || null) as SkillLevel | null,
+                        hand: p.hand,
+                      })
+                    }
+                  >
+                    <option value="">Skill (admin)</option>
+                    <option value="ADVANCED">Advanced</option>
+                    <option value="INTERMEDIATE">Intermediate</option>
+                  </select>
+                </div>
               </li>
             ))}
           </ul>
@@ -149,13 +272,27 @@ export default function AdminPage() {
 
       <section className="panel">
         <h2 className="font-display text-2xl text-gold">Recent bids</h2>
-        <ul className="mt-3 space-y-1 text-sm">
-          {liveBids.map((b) => (
-            <li key={b.id}>
-              <span className="text-gold">₹{b.amount}</span> —{" "}
-              {teamName(state, b.teamId)}
-            </li>
-          ))}
+        <ul className="mt-3 space-y-2 text-sm">
+          {liveBids.map((b, i) => {
+            const isLead =
+              highBid === EQUAL_BID_AMOUNT
+                ? b.amount === EQUAL_BID_AMOUNT
+                : i === 0 && b.amount === highBid;
+            return (
+              <li
+                key={b.id}
+                className={
+                  isLead
+                    ? "bid-pulse rounded-lg border border-[rgba(245,197,24,0.65)] bg-[rgba(245,197,24,0.12)] px-3 py-2 text-base font-extrabold uppercase tracking-wide text-gold"
+                    : "px-1 text-muted"
+                }
+              >
+                <span className="text-gold">₹{b.amount}</span>
+                {" — "}
+                {teamName(state, b.teamId)}
+              </li>
+            );
+          })}
           {liveBids.length === 0 && (
             <li className="text-muted">No bids on current lot</li>
           )}
