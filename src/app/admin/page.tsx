@@ -19,6 +19,10 @@ export default function AdminPage() {
   const { state, error, loading, mutate, setError } = useAuctionState();
   const { burst, soldPlayer } = useSoldCelebration(state);
   const [userId, setUserId] = useState<string | null>(null);
+  const [queueSearch, setQueueSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"ALL" | PlayingRole>("ALL");
+  const [handFilter, setHandFilter] = useState<"ALL" | PlayerHand>("ALL");
+  const [skillFilter, setSkillFilter] = useState<"ALL" | SkillLevel>("ALL");
   const router = useRouter();
 
   useEffect(() => {
@@ -30,11 +34,25 @@ export default function AdminPage() {
     setUserId(s.userId);
   }, [router]);
 
-  const queue = useMemo(
+  const queue = useMemo(() => {
+    if (!state) return [];
+    const q = queueSearch.trim().toLowerCase();
+    return state.players
+      .filter(
+        (p) => !p.isCaptain && (p.status === "AVAILABLE" || p.status === "UNSOLD")
+      )
+      .filter((p) => (q ? p.name.toLowerCase().includes(q) : true))
+      .filter((p) => (roleFilter === "ALL" ? true : p.playingRole === roleFilter))
+      .filter((p) => (handFilter === "ALL" ? true : p.hand === handFilter))
+      .filter((p) => (skillFilter === "ALL" ? true : p.skillLevel === skillFilter))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [state, queueSearch, roleFilter, handFilter, skillFilter]);
+
+  const queueTotal = useMemo(
     () =>
       state?.players.filter(
         (p) => !p.isCaptain && (p.status === "AVAILABLE" || p.status === "UNSOLD")
-      ) ?? [],
+      ).length ?? 0,
     [state]
   );
 
@@ -189,11 +207,96 @@ export default function AdminPage() {
 
         <section className="panel">
           <h2 className="font-display text-2xl text-gold">
-            Queue ({queue.length})
+            Queue ({queue.length}
+            {queue.length !== queueTotal ? ` / ${queueTotal}` : ""})
           </h2>
           <p className="mt-1 text-xs text-muted">
-            Role & hand are public · Skill is admin-only
+            Admin search & filters · Skill is admin-only
           </p>
+
+          <input
+            className="input mt-3"
+            placeholder="Search player name…"
+            value={queueSearch}
+            onChange={(e) => setQueueSearch(e.target.value)}
+          />
+
+          <div className="mt-3 space-y-2">
+            <div>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gold">
+                Role
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["ALL", "All"],
+                    ["BAT", "Batter"],
+                    ["BOWL", "Bowler"],
+                    ["ALL_ROUNDER", "All-rounder"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={roleFilter === value ? "btn-primary" : "btn-secondary"}
+                    style={{ padding: "0.3rem 0.6rem", fontSize: "0.7rem" }}
+                    onClick={() => setRoleFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gold">
+                Hand
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["ALL", "All"],
+                    ["LEFT", "Left"],
+                    ["RIGHT", "Right"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={handFilter === value ? "btn-primary" : "btn-secondary"}
+                    style={{ padding: "0.3rem 0.6rem", fontSize: "0.7rem" }}
+                    onClick={() => setHandFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gold">
+                Skill
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["ALL", "All"],
+                    ["ADVANCED", "Advanced"],
+                    ["INTERMEDIATE", "Intermediate"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={skillFilter === value ? "btn-primary" : "btn-secondary"}
+                    style={{ padding: "0.3rem 0.6rem", fontSize: "0.7rem" }}
+                    onClick={() => setSkillFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <ul className="mt-3 max-h-[28rem] space-y-3 overflow-y-auto text-sm">
             {queue.map((p) => (
               <li
@@ -266,6 +369,9 @@ export default function AdminPage() {
                 </div>
               </li>
             ))}
+            {queue.length === 0 && (
+              <li className="text-muted">No players match search/filters</li>
+            )}
           </ul>
         </section>
       </div>
